@@ -12,9 +12,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
-from qfluentwidgets import setTheme, Theme
+from qfluentwidgets import setTheme, Theme, isDarkTheme
 
 from src.ui.main_window import MainWindow
+from src.ui.theme_helper import apply_app_palette
 from src.config import APP_NAME_CN
 
 
@@ -34,6 +35,8 @@ def main():
 
     # 自动跟随 Windows 系统的深色/浅色偏好
     setTheme(Theme.AUTO)
+    # 初始化全局 Qt 调色板与高对比度配色
+    apply_app_palette(isDarkTheme())
 
     window = MainWindow()
     window.show()

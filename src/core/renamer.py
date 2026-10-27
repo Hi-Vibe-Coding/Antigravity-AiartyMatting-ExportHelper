@@ -1,8 +1,9 @@
 """
 File renaming worker and utilities.
+Safely renames valid files and ignores invalid entries.
 """
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 from PySide6.QtCore import QObject, Signal, QRunnable
 
 from src.config import MatchedImageItem
@@ -15,7 +16,7 @@ class RenameSignals(QObject):
 
 
 class FileRenamerWorker(QRunnable):
-    """后台异步执行重命名任务"""
+    """后台异步执行重命名任务（仅针对有效待重命名图片）"""
     def __init__(self, items: List[MatchedImageItem], overwrite: bool = False):
         super().__init__()
         self.items = items
@@ -29,17 +30,19 @@ class FileRenamerWorker(QRunnable):
     def run(self):
         success_count = 0
         fail_count = 0
-        total = len(self.items)
+        valid_targets = [it for it in self.items if it.is_valid and not it.is_renamed]
+        total = len(valid_targets)
+
+        if total == 0:
+            self.signals.finished.emit(0, 0, self.items)
+            return
 
         try:
-            for idx, item in enumerate(self.items, start=1):
+            for idx, item in enumerate(valid_targets, start=1):
                 if self._is_cancelled:
                     break
 
                 self.signals.progress.emit(idx, total, item.original_name)
-
-                if item.is_renamed:
-                    continue
 
                 source_path = item.file_path
                 target_path = item.folder_path / item.target_name
@@ -56,7 +59,6 @@ class FileRenamerWorker(QRunnable):
                         continue
 
                 try:
-                    # 执行安全重命名
                     new_path = source_path.rename(target_path)
                     item.file_path = new_path
                     item.is_renamed = True

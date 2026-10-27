@@ -1,21 +1,22 @@
 """
 Folder Drop Zone (Module 1 Left Box)
 Accepts drag-and-drop of subfolders, prevents duplicates, displays folder cards with icons,
-and provides '开始扫描' button at the bottom right.
+and provides '递归扫描深层子目录' checkbox (checked by default) and '开始扫描' button.
+Fully optimized for both Light and Dark modes.
 """
 from pathlib import Path
 from typing import List, Set
 
 from PySide6.QtCore import Qt, Signal, QFileInfo
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QFont
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QFileDialog, QSizePolicy
+    QFileDialog
 )
 from qfluentwidgets import (
     CardWidget, PrimaryPushButton, PushButton, TransparentToolButton,
     FluentIcon, IconWidget, InfoBar, InfoBarPosition, SmoothScrollArea, StrongBodyLabel,
-    CaptionLabel, SubtitleLabel
+    CaptionLabel, SubtitleLabel, CheckBox, isDarkTheme
 )
 
 
@@ -39,8 +40,10 @@ class FolderItemCard(CardWidget):
         layout.addWidget(self.icon_widget)
 
         # 文件夹名称
-        self.name_label = StrongBodyLabel(folder_path.name)
-        self.name_label.setStyleSheet("font-weight: 500;")
+        self.name_label = StrongBodyLabel(folder_path.name, self)
+        font = self.name_label.font()
+        font.setWeight(QFont.Weight.Medium)
+        self.name_label.setFont(font)
         layout.addWidget(self.name_label, stretch=1)
 
         # 删除按钮
@@ -59,21 +62,36 @@ class DropContainer(QFrame):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.setObjectName("dropContainer")
-        self.setStyleSheet("""
-            QFrame#dropContainer {
-                border: 2px dashed rgba(120, 120, 120, 0.35);
-                border-radius: 8px;
-                background-color: rgba(255, 255, 255, 0.03);
-            }
-            QFrame#dropContainer:hover {
-                border: 2px dashed #0078d4;
-                background-color: rgba(0, 120, 212, 0.05);
-            }
-        """)
+        self.update_style(isDarkTheme())
+
+    def update_style(self, is_dark: bool):
+        if is_dark:
+            self.setStyleSheet("""
+                QFrame#dropContainer {
+                    border: 2px dashed rgba(255, 255, 255, 0.25);
+                    border-radius: 8px;
+                    background-color: rgba(255, 255, 255, 0.04);
+                }
+                QFrame#dropContainer:hover {
+                    border: 2px dashed #0078d4;
+                    background-color: rgba(0, 120, 212, 0.15);
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame#dropContainer {
+                    border: 2px dashed rgba(0, 0, 0, 0.20);
+                    border-radius: 8px;
+                    background-color: rgba(0, 0, 0, 0.02);
+                }
+                QFrame#dropContainer:hover {
+                    border: 2px dashed #0078d4;
+                    background-color: rgba(0, 120, 212, 0.06);
+                }
+            """)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            # 检查是否有文件夹
             has_dir = False
             for url in event.mimeData().urls():
                 local_path = url.toLocalFile()
@@ -97,7 +115,7 @@ class FolderDropZoneWidget(QFrame):
     """
     区域1左侧模块：子文件夹拖拽与管理面板
     """
-    start_scan_requested = Signal(list)  # 传递 List[Path]
+    start_scan_requested = Signal(list, bool)  # 传递 List[Path], bool(是否递归扫描)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -105,6 +123,7 @@ class FolderDropZoneWidget(QFrame):
         self.folder_list: List[Path] = []
 
         self._init_ui()
+        self.update_theme(isDarkTheme())
 
     def _init_ui(self):
         self.setObjectName("folderDropZoneWidget")
@@ -116,11 +135,10 @@ class FolderDropZoneWidget(QFrame):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(8)
 
-        self.title_label = SubtitleLabel("子文件夹拖入区")
+        self.title_label = SubtitleLabel("子文件夹拖入区", self)
         header_layout.addWidget(self.title_label)
 
-        self.count_badge = CaptionLabel("(0 个目录)")
-        self.count_badge.setStyleSheet("color: rgba(128, 128, 128, 0.9); font-weight: 500;")
+        self.count_badge = CaptionLabel("(0 个目录)", self)
         header_layout.addWidget(self.count_badge)
 
         header_layout.addStretch()
@@ -149,14 +167,13 @@ class FolderDropZoneWidget(QFrame):
         placeholder_icon.setFixedSize(48, 48)
         placeholder_layout.addWidget(placeholder_icon, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        placeholder_tip = StrongBodyLabel("拖拽子文件夹到此处")
-        placeholder_tip.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder_layout.addWidget(placeholder_tip)
+        self.placeholder_tip = StrongBodyLabel("拖拽子文件夹到此处", self.placeholder_widget)
+        self.placeholder_tip.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        placeholder_layout.addWidget(self.placeholder_tip)
 
-        placeholder_subtip = CaptionLabel("支持逐一拖入，系统将自动校验去重")
-        placeholder_subtip.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder_subtip.setStyleSheet("color: rgba(128, 128, 128, 0.8);")
-        placeholder_layout.addWidget(placeholder_subtip)
+        self.placeholder_subtip = CaptionLabel("支持逐一拖入，系统将自动校验去重", self.placeholder_widget)
+        self.placeholder_subtip.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        placeholder_layout.addWidget(self.placeholder_subtip)
 
         drop_layout.addWidget(self.placeholder_widget)
 
@@ -177,9 +194,9 @@ class FolderDropZoneWidget(QFrame):
 
         layout.addWidget(self.drop_container, stretch=1)
 
-        # 底部操作栏（包含右下角的“开始扫描”按钮）
+        # 底部操作栏：包含清空按钮、递归扫描复选框、开始扫描按钮
         bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(10)
+        bottom_layout.setSpacing(12)
 
         self.clear_btn = PushButton(FluentIcon.DELETE, "清空列表", self)
         self.clear_btn.setFixedHeight(34)
@@ -189,18 +206,34 @@ class FolderDropZoneWidget(QFrame):
 
         bottom_layout.addStretch()
 
+        # 递归扫描开关（默认勾选）
+        self.recursive_checkbox = CheckBox("递归扫描深层子目录", self)
+        self.recursive_checkbox.setChecked(True)
+        self.recursive_checkbox.setToolTip("开启后将深度扫描当前子文件夹下所有嵌套内置子文件夹中的图片")
+        bottom_layout.addWidget(self.recursive_checkbox)
+
         # 关键需求：拖拽完成后，在右下角出现按钮“开始扫描”
         self.scan_btn = PrimaryPushButton(FluentIcon.SEARCH, "开始扫描", self)
         self.scan_btn.setFixedHeight(34)
-        self.scan_btn.setFixedWidth(120)
+        self.scan_btn.setFixedWidth(110)
         self.scan_btn.clicked.connect(self._on_start_scan_clicked)
-        self.scan_btn.hide()  # 初始没有文件夹时隐藏
+        self.scan_btn.hide()
         bottom_layout.addWidget(self.scan_btn)
 
         layout.addLayout(bottom_layout)
 
         # 绑定拖拽事件
         self.drop_container.folder_dropped.connect(self.add_folder)
+
+    def update_theme(self, is_dark: bool):
+        """根据当前深浅主题，刷新边框和辅助文字的高对比度配色"""
+        self.drop_container.update_style(is_dark)
+        if is_dark:
+            self.count_badge.setStyleSheet("color: rgba(255, 255, 255, 0.65); font-weight: 500;")
+            self.placeholder_subtip.setStyleSheet("color: rgba(255, 255, 255, 0.60);")
+        else:
+            self.count_badge.setStyleSheet("color: rgba(0, 0, 0, 0.60); font-weight: 500;")
+            self.placeholder_subtip.setStyleSheet("color: rgba(0, 0, 0, 0.55);")
 
     def _choose_folder_dialog(self):
         dir_path = QFileDialog.getExistingDirectory(self, "选择要添加的子文件夹")
@@ -229,14 +262,11 @@ class FolderDropZoneWidget(QFrame):
             )
             return
 
-        # 添加到集合与列表
         self.folder_set.add(folder_path)
         self.folder_list.append(folder_path)
 
-        # 创建卡片
         card = FolderItemCard(folder_path, self.list_content_widget)
         card.removed.connect(self.remove_folder)
-        # 插入到底部弹簧之前
         self.list_content_layout.insertWidget(self.list_content_layout.count() - 1, card)
 
         self._update_state()
@@ -246,7 +276,6 @@ class FolderDropZoneWidget(QFrame):
             self.folder_set.remove(folder_path)
             self.folder_list.remove(folder_path)
 
-            # 移除 UI 卡片
             for i in range(self.list_content_layout.count() - 1):
                 item = self.list_content_layout.itemAt(i)
                 if item and item.widget() and isinstance(item.widget(), FolderItemCard):
@@ -262,7 +291,6 @@ class FolderDropZoneWidget(QFrame):
         self.folder_set.clear()
         self.folder_list.clear()
 
-        # 清除所有卡片
         while self.list_content_layout.count() > 1:
             item = self.list_content_layout.takeAt(0)
             if item.widget():
@@ -278,7 +306,6 @@ class FolderDropZoneWidget(QFrame):
         self.placeholder_widget.setVisible(not has_items)
         self.scroll_area.setVisible(has_items)
         self.clear_btn.setVisible(has_items)
-        # 右下角按钮“开始扫描”在有子文件夹时出现
         self.scan_btn.setVisible(has_items)
 
     def _on_start_scan_clicked(self):
@@ -291,4 +318,5 @@ class FolderDropZoneWidget(QFrame):
                 position=InfoBarPosition.TOP
             )
             return
-        self.start_scan_requested.emit(list(self.folder_list))
+        is_recursive = self.recursive_checkbox.isChecked()
+        self.start_scan_requested.emit(list(self.folder_list), is_recursive)

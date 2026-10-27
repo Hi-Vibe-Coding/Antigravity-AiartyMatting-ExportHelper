@@ -9,7 +9,7 @@ from typing import List
 from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QSplitter
 from qfluentwidgets import (
-    CardWidget, TitleLabel, CaptionLabel, InfoBar, InfoBarPosition
+    CardWidget, TitleLabel, CaptionLabel, InfoBar, InfoBarPosition, isDarkTheme
 )
 
 from src.config import MatchedImageItem
@@ -31,6 +31,7 @@ class Module1Widget(CardWidget):
 
         self._init_ui()
         self._bind_events()
+        self.update_theme(isDarkTheme())
 
     def _init_ui(self):
         self.setObjectName("module1Widget")
@@ -42,13 +43,12 @@ class Module1Widget(CardWidget):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(10)
 
-        title = TitleLabel("模块 1：特殊命名图片识别与逻辑重命名")
-        title.setStyleSheet("font-size: 18px; font-weight: 600;")
-        header_layout.addWidget(title)
+        self.title = TitleLabel("模块 1：特殊命名图片识别与逻辑重命名", self)
+        self.title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        header_layout.addWidget(self.title)
 
-        desc = CaptionLabel("支持子文件夹拖拽识别，精准捕获 *_attr1_subject 目标图片并提取逻辑父名称")
-        desc.setStyleSheet("color: rgba(128, 128, 128, 0.85); margin-top: 4px;")
-        header_layout.addWidget(desc)
+        self.desc = CaptionLabel("支持子文件夹拖拽识别，完整列出目录图片，区分有效「待重命名」与「无效」文件", self)
+        header_layout.addWidget(self.desc)
         header_layout.addStretch()
 
         layout.addLayout(header_layout)
@@ -69,21 +69,30 @@ class Module1Widget(CardWidget):
         self.splitter.addWidget(self.right_result_table)
 
         # 设置左右宽度比为 3.5 : 6.5
-        self.splitter.setSizes([380, 720])
+        self.splitter.setSizes([360, 740])
 
         layout.addWidget(self.splitter, stretch=1)
 
+    def update_theme(self, is_dark: bool):
+        """同步子组件与自身的深浅主题配色"""
+        if is_dark:
+            self.desc.setStyleSheet("color: rgba(255, 255, 255, 0.65); margin-top: 4px;")
+        else:
+            self.desc.setStyleSheet("color: rgba(0, 0, 0, 0.55); margin-top: 4px;")
+
+        self.left_drop_zone.update_theme(is_dark)
+        self.right_result_table.update_theme(is_dark)
+
     def _bind_events(self):
-        # 扫描事件
         self.left_drop_zone.start_scan_requested.connect(self._start_scanning)
-        # 重命名事件
         self.right_result_table.rename_requested.connect(self._start_renaming)
 
-    def _start_scanning(self, folder_paths: List[Path]):
+    def _start_scanning(self, folder_paths: List[Path], recursive: bool = True):
         self.right_result_table.set_loading(True)
-        self.right_result_table.status_info.setText("正在扫描图片...")
+        scan_mode_desc = " (递归扫描)" if recursive else ""
+        self.right_result_table.status_info.setText(f"正在扫描图片{scan_mode_desc}...")
 
-        worker = FolderScannerWorker(folder_paths)
+        worker = FolderScannerWorker(folder_paths, recursive=recursive)
         worker.signals.progress.connect(self._on_scan_progress)
         worker.signals.finished.connect(self._on_scan_finished)
         worker.signals.error.connect(self._on_scan_error)
@@ -100,21 +109,35 @@ class Module1Widget(CardWidget):
         self.right_result_table.set_loading(False)
         self.right_result_table.set_results(matched_items)
 
-        count = len(matched_items)
-        if count == 0:
-            self.right_result_table.status_info.setText("扫描完成：未发现匹配的特殊命名图片")
+        total_count = len(matched_items)
+        valid_count = sum(1 for it in matched_items if it.is_valid)
+        invalid_count = total_count - valid_count
+
+        if total_count == 0:
+            self.right_result_table.status_info.setText("扫描完成：文件夹内未发现图片文件")
             InfoBar.info(
                 title="扫描完成",
-                content="所选子文件夹中未找到以 '_attr1_subject' 命名的有效图片。",
+                content="所选子文件夹中未找到任何图片文件。",
                 parent=self.window(),
                 duration=3000,
                 position=InfoBarPosition.TOP
             )
+        elif valid_count == 0:
+            self.right_result_table.status_info.setText(f"扫描完成：共 {total_count} 张图片，均不符合规则（全部为无效）")
+            InfoBar.warning(
+                title="未发现有效图片",
+                content=f"共扫描到 {total_count} 张图片，但全部为「无效」状态（未匹配特殊机制命名规则）。",
+                parent=self.window(),
+                duration=3500,
+                position=InfoBarPosition.TOP
+            )
         else:
-            self.right_result_table.status_info.setText(f"扫描完成：共发现 {count} 张有效图片")
+            self.right_result_table.status_info.setText(
+                f"扫描完成：共 {total_count} 张图片（有效 {valid_count} 张，无效 {invalid_count} 张）"
+            )
             InfoBar.success(
                 title="扫描成功",
-                content=f"共找出 {count} 张符合规则的图片，并已计算逻辑父名称！",
+                content=f"共发现 {total_count} 张图片，其中 {valid_count} 张为有效图片（待重命名）！",
                 parent=self.window(),
                 duration=2500,
                 position=InfoBarPosition.TOP
@@ -131,7 +154,8 @@ class Module1Widget(CardWidget):
         )
 
     def _start_renaming(self, items: List[MatchedImageItem]):
-        if not items:
+        valid_items = [it for it in items if it.is_valid and not it.is_renamed]
+        if not valid_items:
             return
 
         self.right_result_table.set_loading(True)
@@ -150,7 +174,7 @@ class Module1Widget(CardWidget):
         if fail_count == 0:
             InfoBar.success(
                 title="重命名完成",
-                content=f"全部 {success_count} 个图片文件已成功更名！",
+                content=f"全部 {success_count} 个有效文件已成功更名！",
                 parent=self.window(),
                 duration=3000,
                 position=InfoBarPosition.TOP
