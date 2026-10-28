@@ -98,25 +98,34 @@ class SingleFolderDropContainer(QFrame):
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            # 检查是否包含文件夹
-            for url in event.mimeData().urls():
-                p = Path(url.toLocalFile())
-                if p.is_dir():
-                    event.acceptProposedAction()
-                    return
+            try:
+                for url in event.mimeData().urls():
+                    local_path = url.toLocalFile()
+                    if local_path and QFileInfo(local_path).isDir():
+                        event.acceptProposedAction()
+                        return
+            except Exception:
+                pass
         event.ignore()
 
     def dragMoveEvent(self, event):
         event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent):
-        if event.mimeData().hasUrls():
-            dirs = [Path(url.toLocalFile()) for url in event.mimeData().urls() if Path(url.toLocalFile()).is_dir()]
-            if dirs:
-                # 严格限制：只接收一个文件夹（若拖入多个，取首个有效文件夹）
-                self.folder_dropped.emit(dirs[0])
-                event.acceptProposedAction()
-                return
+        try:
+            if event.mimeData().hasUrls():
+                dirs = []
+                for url in event.mimeData().urls():
+                    local_path = url.toLocalFile()
+                    if local_path and QFileInfo(local_path).isDir():
+                        dirs.append(Path(local_path))
+                if dirs:
+                    # 严格限制：只接收一个文件夹（若拖入多个，取首个有效文件夹）
+                    self.folder_dropped.emit(dirs[0])
+                    event.acceptProposedAction()
+                    return
+        except Exception:
+            pass
         event.ignore()
 
 
@@ -146,7 +155,7 @@ class SingleFolderDropZone(QWidget):
 
         # 顶部标题栏
         top_layout = QHBoxLayout()
-        self.header_title = SubtitleLabel("模块2的源文件夹", self)
+        self.header_title = SubtitleLabel("源文件夹", self)
         self.header_title.setStyleSheet("font-size: 15px; font-weight: 600;")
         top_layout.addWidget(self.header_title)
 

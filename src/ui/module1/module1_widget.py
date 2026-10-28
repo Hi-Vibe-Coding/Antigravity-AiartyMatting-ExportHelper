@@ -44,7 +44,7 @@ class Module1Widget(CardWidget):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(10)
 
-        self.title = TitleLabel("模块 1：特殊命名图片识别与逻辑重命名", self)
+        self.title = TitleLabel("模块 1：特殊命名图片识别", self)
         self.title.setStyleSheet("font-size: 18px; font-weight: 600;")
         header_layout.addWidget(self.title)
 

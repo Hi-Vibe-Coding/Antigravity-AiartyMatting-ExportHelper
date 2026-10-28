@@ -1,0 +1,23 @@
+[2026-10-28 16:46:06] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 16:46:06] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 16:46:06] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 16:46:06] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 16:46:06] [INFO] [MainThread] (<string>:4): Logger test under project root
+[2026-10-28 16:47:52] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 16:47:52] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 16:47:52] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 16:47:52] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 16:48:41] [CRITICAL] [MainThread] (logger.py:71): 捕获到未处理的严重异常 / 崩溃：
+Traceback (most recent call last):
+  File "D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\src\ui\module2\trace_result_table.py", line 36, in paint
+    widget.style().drawControl(widget.style().CE_ItemViewItem, options, painter)
+AttributeError: 'PySide6.QtWidgets.QCommonStyle' object has no attribute 'CE_ItemViewItem'
+
+[2026-10-28 16:53:03] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 16:53:03] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 16:53:03] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 16:53:03] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 16:59:50] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 16:59:50] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 16:59:50] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 16:59:50] [INFO] [MainThread] (logger.py:59): ============================================================

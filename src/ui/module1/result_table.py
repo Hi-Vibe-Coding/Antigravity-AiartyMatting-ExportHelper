@@ -164,7 +164,7 @@ class ResultTableWidget(QFrame):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(10)
 
-        self.title_label = SubtitleLabel("匹配图片与逻辑命名列表", self)
+        self.title_label = SubtitleLabel("图片列表", self)
         header_layout.addWidget(self.title_label)
 
         self.count_label = CaptionLabel("(0 项)", self)
@@ -256,6 +256,7 @@ class ResultTableWidget(QFrame):
         self.rename_btn = PrimaryPushButton(FluentIcon.EDIT, "一键应用重命名", self)
         self.rename_btn.setFixedHeight(34)
         self.rename_btn.clicked.connect(self._on_rename_clicked)
+        self.rename_btn.hide()  # 需求：隐藏一键应用重命名按钮
         bottom_layout.addWidget(self.rename_btn)
 
         layout.addLayout(bottom_layout)

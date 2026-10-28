@@ -1,0 +1,5 @@
+[2026-10-28 16:45:51] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 16:45:51] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 16:45:51] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\src\logs\app.log
+[2026-10-28 16:45:51] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 16:45:51] [INFO] [MainThread] (<string>:4): Test log message

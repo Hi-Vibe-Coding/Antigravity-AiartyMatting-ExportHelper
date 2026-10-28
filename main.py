@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from qfluentwidgets import setTheme, Theme, isDarkTheme
 
+from src.core.logger import init_logging_system, logger
 from src.ui.main_window import MainWindow
 from src.ui.theme_helper import apply_app_palette
 from src.config import APP_NAME_CN
@@ -28,6 +29,8 @@ def setup_high_dpi():
 
 
 def main():
+    # 初始化全局日志系统与未捕获异常拦截器
+    init_logging_system()
     setup_high_dpi()
 
     app = QApplication(sys.argv)

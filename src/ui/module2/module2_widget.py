@@ -3,6 +3,7 @@ Area 2 / Module 2 Widget: '溯源到父文件夹'
 Combines SingleFolderDropZone (left) and TraceResultTableWidget (right).
 Inherits semi-transparent lock mask overlay logic.
 """
+import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -16,7 +17,7 @@ from qfluentwidgets import (
 )
 
 from src.config import MatchedImageItem
-from src.core.tracer import LogicalTraceItem
+from src.core.tracer import LogicalTraceItem, format_relative_path
 from src.ui.module2.single_folder_drop_zone import SingleFolderDropZone
 from src.ui.module2.trace_result_table import TraceResultTableWidget
 
@@ -126,8 +127,12 @@ class Module2Widget(CardWidget):
         """
         核心分析逻辑：
         遍历模块1中的数据行，每找到一个“逻辑父文件夹”，
-        则在“模块2的源文件夹”中查找与“逻辑父文件夹”同名的文件夹。
-        若找不到，状态标记为“无法找到”；若找到，状态标记为“已匹配”。
+        则在“源文件夹”中查找与“逻辑父文件夹”同名的文件夹：
+        1. “源文件夹”自身也可以直接作为逻辑对比（源文件夹名与逻辑父文件夹一致）。
+        2. 在源文件夹下递归遍历所有子文件夹查找同名目录：
+           - 找到 0 个：状态标记为「无法找到」
+           - 找到 1 个：状态标记为「已匹配」
+           - 找到 >1 个：状态标记为「同名文件夹不唯一」
         """
         if not source_folder.is_dir():
             InfoBar.error(
@@ -149,19 +154,28 @@ class Module2Widget(CardWidget):
             )
             return
 
-        # 扫描源文件夹下的所有直接子目录（建立名称映射）
-        existing_subdirs = {}
+        # 扫描源文件夹自身及其内部所有子文件夹，建立名称映射：name -> List[Path]
+        folder_name_map = {}
+
+        def _add_folder(name: str, p: Path):
+            if name not in folder_name_map:
+                folder_name_map[name] = []
+            if p not in folder_name_map[name]:
+                folder_name_map[name].append(p)
+
         try:
-            for entry in source_folder.iterdir():
-                if entry.is_dir():
-                    existing_subdirs[entry.name] = entry
-                    lower_key = entry.name.lower()
-                    if lower_key not in existing_subdirs:
-                        existing_subdirs[lower_key] = entry
+            # 1. 源文件夹自身直接作为逻辑对比
+            _add_folder(source_folder.name, source_folder)
+
+            # 2. 遍历源文件夹下的子目录
+            for root, dirs, _ in os.walk(source_folder):
+                for d in dirs:
+                    d_path = Path(root) / d
+                    _add_folder(d, d_path)
         except Exception as e:
             InfoBar.error(
                 title="读取目录失败",
-                content=f"无法读取模块2源文件夹：{e}",
+                content=f"无法读取源文件夹：{e}",
                 parent=self,
                 duration=4000,
                 position=InfoBarPosition.TOP
@@ -176,43 +190,104 @@ class Module2Widget(CardWidget):
             if not item.is_valid or not item.logical_parent or item.logical_parent == "-":
                 continue
 
-            target_folder = existing_subdirs.get(item.logical_parent)
-            if not target_folder:
-                # 尝试小写查找
-                target_folder = existing_subdirs.get(item.logical_parent.lower())
+            # 字段2计算：原文件相对完整路径（尽可能显示2层文件夹及文件名，如：Aiarty Image-测试用例\Batch_Export_案例3\B0-001__1_attr1_subject.png）
+            raw_file_display = format_relative_path(item.file_path, max_levels=3)
 
-            if target_folder and target_folder.is_dir():
+            # 字段3计算：预期重命名
+            expected_rename = item.target_name
+
+            target_name = item.logical_parent
+            # 精确匹配（若无，可尝试不区分大小写查找）
+            matches = folder_name_map.get(target_name, [])
+            if not matches:
+                lower_target = target_name.lower()
+                for k, v in folder_name_map.items():
+                    if k.lower() == lower_target:
+                        matches.extend([p for p in v if p not in matches])
+
+            match_count = len(matches)
+
+            if match_count == 1:
+                # 唯一匹配
+                matched_folder = matches[0]
+                dest_file = matched_folder / expected_rename
+
+                # 检查同名文件夹中是否已有同名图片文件
+                # 计算目标路径相对显示（尽可能3层，如：A 预制\Bracelet\B0-001）
+                target_folder_display = format_relative_path(matched_folder, max_levels=3)
+
+                if dest_file.exists():
+                    status_text = f"即将被写入到[{target_folder_display}](同名文件将覆盖!)"
+                    status_type = "override"
+                else:
+                    status_text = f"即将被写入到[{target_folder_display}]"
+                    status_type = "normal"
+
                 trace_item = LogicalTraceItem(
                     original_item_idx=idx + 1,
-                    original_name=item.original_name,
-                    target_name=item.target_name,
+                    raw_file_display=raw_file_display,
+                    expected_rename=expected_rename,
                     logical_parent=item.logical_parent,
-                    matched_target_folder=target_folder,
-                    status="已匹配",
-                    is_matched=True
+                    status_display=status_text,
+                    status_type=status_type,
+                    full_source_file=item.file_path,
+                    matched_target_folder=matched_folder,
+                    dest_file_path=dest_file,
+                    dest_folder_display=target_folder_display,
+                    candidate_folders=matches
+                )
+            elif match_count > 1:
+                # 同名文件夹不唯一
+                trace_item = LogicalTraceItem(
+                    original_item_idx=idx + 1,
+                    raw_file_display=raw_file_display,
+                    expected_rename=expected_rename,
+                    logical_parent=item.logical_parent,
+                    status_display="同名文件夹不唯一",
+                    status_type="error",
+                    full_source_file=item.file_path,
+                    matched_target_folder=None,
+                    dest_file_path=None,
+                    candidate_folders=matches
                 )
             else:
+                # 无法找到
                 trace_item = LogicalTraceItem(
                     original_item_idx=idx + 1,
-                    original_name=item.original_name,
-                    target_name=item.target_name,
+                    raw_file_display=raw_file_display,
+                    expected_rename=expected_rename,
                     logical_parent=item.logical_parent,
+                    status_display="无法找到",
+                    status_type="error",
+                    full_source_file=item.file_path,
                     matched_target_folder=None,
-                    status="无法找到",
-                    is_matched=False
+                    dest_file_path=None,
+                    candidate_folders=[]
                 )
 
             trace_results.append(trace_item)
 
         self.right_table.set_results(trace_results)
 
-        matched_count = sum(1 for it in trace_results if it.is_matched)
-        unmatched_count = len(trace_results) - matched_count
+        normal_count = sum(1 for it in trace_results if it.status_type == "normal")
+        override_count = sum(1 for it in trace_results if it.status_type == "override")
+        ambiguous_count = sum(1 for it in trace_results if it.status_display == "同名文件夹不唯一")
+        not_found_count = sum(1 for it in trace_results if it.status_display == "无法找到")
 
-        if unmatched_count > 0:
+        if ambiguous_count > 0 or not_found_count > 0 or override_count > 0:
+            msg_parts = []
+            if normal_count > 0:
+                msg_parts.append(f"{normal_count} 项即将写入")
+            if override_count > 0:
+                msg_parts.append(f"{override_count} 项同名将覆盖")
+            if ambiguous_count > 0:
+                msg_parts.append(f"{ambiguous_count} 项同名不唯一")
+            if not_found_count > 0:
+                msg_parts.append(f"{not_found_count} 项无法找到")
+
             InfoBar.warning(
-                title="分析完成 (含未命中项)",
-                content=f"共分析 {len(trace_results)} 条数据：{matched_count} 项成功匹配，{unmatched_count} 项「无法找到」同名文件夹！",
+                title="分析完成 (需关注状态)",
+                content=f"共分析 {len(trace_results)} 条数据：" + "，".join(msg_parts),
                 parent=self,
                 duration=4500,
                 position=InfoBarPosition.TOP
@@ -220,7 +295,7 @@ class Module2Widget(CardWidget):
         else:
             InfoBar.success(
                 title="分析完成",
-                content=f"共分析 {len(trace_results)} 条数据，全部 {matched_count} 项均已成功在源文件夹中匹配！",
+                content=f"共分析 {len(trace_results)} 条数据，全部 {normal_count} 项均唯一定位无冲突！",
                 parent=self,
                 duration=3500,
                 position=InfoBarPosition.TOP
