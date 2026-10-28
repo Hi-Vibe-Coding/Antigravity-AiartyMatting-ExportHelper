@@ -94,21 +94,22 @@ def run_tests():
         row0_expected = table.item(0, 2).text()
         row0_status = table.item(0, 3).text()
         print(f"Row 0: orig='{row0_orig}', expected='{row0_expected}', status='{row0_status}'")
-        assert "Aiarty_Images\\Batch_Export_Case3\\B0-001__1_attr1_subject.png" in row0_orig, "Expected 2-level folder display in Field 2"
+        assert row0_orig == "B0-001__1_attr1_subject.png", f"Expected filename only in Field 2, got {row0_orig}"
         assert row0_expected == "B0-001__1.png"
         assert row0_status == "即将被写入到[A_Prefab\\Bracelet\\B0-001]"
         assert results[0].status_type == "normal"
-        print("Test Case 1 (Normal Write Path with Brackets) [OK]")
+        print("Test Case 1 (Normal Write Path with Brackets & Pure Filename) [OK]")
 
         # 验证项2: 同名文件已存在 -> 即将被写入到[XXXX](同名文件将覆盖!)
         row1_orig = table.item(1, 1).text()
         row1_expected = table.item(1, 2).text()
         row1_status = table.item(1, 3).text()
         print(f"Row 1: orig='{row1_orig}', expected='{row1_expected}', status='{row1_status}'")
+        assert row1_orig == "B0-002__1_attr1_subject.png"
         assert row1_expected == "B0-002__1.png"
         assert row1_status == "即将被写入到[A_Prefab\\Rings\\B0-002](同名文件将覆盖!)"
         assert results[1].status_type == "override"
-        print("Test Case 2 (File Override Detection with Brackets) [OK]")
+        print("Test Case 2 (File Override Detection with Brackets & Pure Filename) [OK]")
 
         # 验证项3: 同名文件夹不唯一
         row2_status = table.item(2, 3).text()

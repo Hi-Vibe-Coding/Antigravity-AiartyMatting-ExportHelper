@@ -21,3 +21,15 @@ AttributeError: 'PySide6.QtWidgets.QCommonStyle' object has no attribute 'CE_Ite
 [2026-10-28 16:59:50] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
 [2026-10-28 16:59:50] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
 [2026-10-28 16:59:50] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 17:06:58] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 17:06:58] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 17:06:58] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 17:06:58] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 17:13:28] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 17:13:28] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 17:13:28] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 17:13:28] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 17:27:02] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 17:27:02] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 17:27:02] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 17:27:02] [INFO] [MainThread] (logger.py:59): ============================================================

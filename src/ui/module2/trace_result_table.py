@@ -5,14 +5,14 @@ Shows status: '已匹配' vs '无法找到' with high-contrast colors and toolti
 """
 from typing import List
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QBrush, QFont
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QHeaderView, QTableWidgetItem
 )
 from qfluentwidgets import (
-    TableWidget, SubtitleLabel, CaptionLabel, PushButton, FluentIcon,
-    isDarkTheme, IndeterminateProgressBar
+    TableWidget, SubtitleLabel, CaptionLabel, PushButton, PrimaryPushButton, FluentIcon,
+    isDarkTheme, IndeterminateProgressBar, ProgressBar
 )
 
 from src.core.tracer import LogicalTraceItem
@@ -22,6 +22,7 @@ class TraceResultTableWidget(QWidget):
     """
     模块2右侧：对照数据表
     """
+    copy_requested = Signal()  # 触发“开始复制”操作信号
     def __init__(self, parent=None):
         super().__init__(parent)
         self.trace_items: List[LogicalTraceItem] = []
@@ -102,11 +103,25 @@ class TraceResultTableWidget(QWidget):
         self.status_label = CaptionLabel("等待分析指令...", self)
         bottom_layout.addWidget(self.status_label, stretch=1)
 
+        # 复制进度条（复制进行中时显示百分比进度）
+        self.copy_progress_bar = ProgressBar(self)
+        self.copy_progress_bar.setFixedHeight(8)
+        self.copy_progress_bar.setFixedWidth(160)
+        self.copy_progress_bar.hide()
+        bottom_layout.addWidget(self.copy_progress_bar)
+
         self.clear_btn = PushButton(FluentIcon.DELETE, "清空列表", self)
         self.clear_btn.setFixedHeight(32)
         self.clear_btn.clicked.connect(self.clear_results)
         self.clear_btn.setEnabled(False)
         bottom_layout.addWidget(self.clear_btn)
+
+        # 需求：右下角添加按钮“开始复制”
+        self.copy_btn = PrimaryPushButton(FluentIcon.SAVE_COPY, "开始复制", self)
+        self.copy_btn.setFixedHeight(32)
+        self.copy_btn.clicked.connect(self.copy_requested.emit)
+        self.copy_btn.setEnabled(False)
+        bottom_layout.addWidget(self.copy_btn)
 
         layout.addLayout(bottom_layout)
 
@@ -190,12 +205,40 @@ class TraceResultTableWidget(QWidget):
         self.status_label.setText("列表已清空")
         self._update_view()
 
+    def set_copying_state(self, is_copying: bool):
+        """设置复制状态与进度控件展现"""
+        if is_copying:
+            self.copy_progress_bar.setValue(0)
+            self.copy_progress_bar.show()
+            self.copy_btn.setEnabled(False)
+            self.clear_btn.setEnabled(False)
+        else:
+            self.copy_progress_bar.hide()
+            self.clear_btn.setEnabled(True)
+            self._update_view()
+
+    def update_copy_progress(self, current: int, total: int, filename: str):
+        """实时更新复制进度"""
+        if total > 0:
+            val = int(current / total * 100)
+            self.copy_progress_bar.setValue(val)
+        self.status_label.setText(f"正在复制 ({current}/{total}): {filename}")
+
+    def update_copy_finished(self, success_count: int, fail_count: int, items: List[LogicalTraceItem]):
+        """复制完成"""
+        self.set_copying_state(False)
+        self.set_results(items)
+        self.status_label.setText(f"复制完成：成功传输 {success_count} 项，失败 {fail_count} 项")
+
     def _update_view(self):
         total = len(self.trace_items)
         normal_count = sum(1 for it in self.trace_items if it.status_type == "normal")
         override_count = sum(1 for it in self.trace_items if it.status_type == "override")
         ambiguous_count = sum(1 for it in self.trace_items if it.status_display == "同名文件夹不唯一")
         not_found_count = sum(1 for it in self.trace_items if it.status_display == "无法找到")
+
+        # 检查是否有可复制项（目标明确唯一定位）
+        can_copy = (normal_count + override_count) > 0
 
         if total > 0:
             count_parts = [f"即将写入: {normal_count}"]
@@ -217,6 +260,11 @@ class TraceResultTableWidget(QWidget):
         self.table.setVisible(has_items)
         self.empty_label.setVisible(not has_items)
         self.clear_btn.setEnabled(has_items)
+        self.copy_btn.setEnabled(can_copy)
+        if can_copy:
+            self.copy_btn.setText(f"开始复制 ({normal_count + override_count})")
+        else:
+            self.copy_btn.setText("开始复制")
 
     def update_theme(self, is_dark: bool):
         if is_dark:

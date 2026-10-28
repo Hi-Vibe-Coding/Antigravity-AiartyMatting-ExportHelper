@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QFrame, QStackedLayout
 )
@@ -18,6 +18,7 @@ from qfluentwidgets import (
 
 from src.config import MatchedImageItem
 from src.core.tracer import LogicalTraceItem, format_relative_path
+from src.core.copier import FileCopierWorker
 from src.ui.module2.single_folder_drop_zone import SingleFolderDropZone
 from src.ui.module2.trace_result_table import TraceResultTableWidget
 
@@ -33,6 +34,8 @@ class Module2Widget(CardWidget):
         super().__init__(parent)
         self.is_locked = True
         self.setMinimumHeight(520)
+        self.thread_pool = QThreadPool.globalInstance()
+        self.current_copier_worker = None
 
         # 缓存从外部/模块1传入的有效图片项数据源
         self.source_module1_items: List[MatchedImageItem] = []
@@ -114,6 +117,71 @@ class Module2Widget(CardWidget):
         self.left_drop_zone.start_analyze_requested.connect(self._run_analysis)
         self.left_drop_zone.folder_selected.connect(self._on_source_folder_changed)
         self.left_drop_zone.folder_cleared.connect(self._on_source_folder_changed)
+        self.right_table.copy_requested.connect(self._start_copying)
+
+    def _start_copying(self):
+        """响应点击“开始复制”操作：在后台线程中逐一复制文件并反馈实时进度"""
+        items_to_copy = self.right_table.trace_items
+        valid_items = [
+            it for it in items_to_copy
+            if it.matched_target_folder and it.dest_file_path and it.full_source_file
+        ]
+
+        if not valid_items:
+            InfoBar.warning(
+                title="无有效复制项",
+                content="当前列表中没有可唯一定位写入目标的有效图片！",
+                parent=self,
+                duration=3500,
+                position=InfoBarPosition.TOP
+            )
+            return
+
+        self.right_table.set_copying_state(True)
+
+        worker = FileCopierWorker(items_to_copy)
+        worker.signals.progress.connect(self._on_copy_progress)
+        worker.signals.finished.connect(self._on_copy_finished)
+        worker.signals.error.connect(self._on_copy_error)
+
+        self.current_copier_worker = worker
+        self.thread_pool.start(worker)
+
+    def _on_copy_progress(self, current: int, total: int, filename: str):
+        self.right_table.update_copy_progress(current, total, filename)
+
+    def _on_copy_finished(self, success_count: int, fail_count: int, items: List[LogicalTraceItem]):
+        self.right_table.update_copy_finished(success_count, fail_count, items)
+        self.current_copier_worker = None
+
+        # 需求：复制结束后，飘字提醒
+        if fail_count == 0:
+            InfoBar.success(
+                title="复制完成",
+                content=f"恭喜！全部 {success_count} 张图片已成功复制到目标逻辑父文件夹！",
+                parent=self.window(),
+                duration=4500,
+                position=InfoBarPosition.TOP
+            )
+        else:
+            InfoBar.warning(
+                title="复制完成 (部分失败)",
+                content=f"已成功复制 {success_count} 张图片，{fail_count} 张复制失败，请查看列表状态。",
+                parent=self.window(),
+                duration=5000,
+                position=InfoBarPosition.TOP
+            )
+
+    def _on_copy_error(self, err_msg: str):
+        self.right_table.set_copying_state(False)
+        self.current_copier_worker = None
+        InfoBar.error(
+            title="复制出错",
+            content=f"执行复制任务过程中发生错误：{err_msg}",
+            parent=self.window(),
+            duration=4000,
+            position=InfoBarPosition.TOP
+        )
 
     def _on_source_folder_changed(self, *args):
         """需求：每当拖入一个新的源文件夹(或移除一个源文件夹)，则右侧数据列表就刷新为空"""
@@ -190,8 +258,8 @@ class Module2Widget(CardWidget):
             if not item.is_valid or not item.logical_parent or item.logical_parent == "-":
                 continue
 
-            # 字段2计算：原文件相对完整路径（尽可能显示2层文件夹及文件名，如：Aiarty Image-测试用例\Batch_Export_案例3\B0-001__1_attr1_subject.png）
-            raw_file_display = format_relative_path(item.file_path, max_levels=3)
+            # 字段2计算：原文件仅显示纯文件名（如 B0-001__1_attr1_subject.png）
+            raw_file_display = item.original_name
 
             # 字段3计算：预期重命名
             expected_rename = item.target_name

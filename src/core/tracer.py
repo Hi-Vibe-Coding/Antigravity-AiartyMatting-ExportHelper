@@ -31,7 +31,7 @@ class LogicalTraceItem:
     """
     模块2对照数据项：
     - 字段1: 序号 (original_item_idx)
-    - 字段2: 原文件 (raw_file_display: 尽可能显示2层文件夹及文件名，如: Aiarty Image-测试用例\\Batch_Export_案例3\\B0-001__1_attr1_subject.png)
+    - 字段2: 原文件 (raw_file_display: 纯文件名，如: B0-001__1_attr1_subject.png)
     - 字段3: 预期重命名 (expected_rename: 如 B0-001__1.png)
     - 字段4: 状态 (status_display: 错误状态 或 即将被写入到XXXX 或 同名文件将覆盖!)
     """
