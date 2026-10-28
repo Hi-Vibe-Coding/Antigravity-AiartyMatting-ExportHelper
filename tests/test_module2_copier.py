@@ -90,6 +90,11 @@ def run_tests():
         assert "已成功写入到" in status2
         print("UI status row text updated to '已成功写入到[...]' [OK]")
 
+        # 核心需求验证：执行成功后，“开始复制”按钮变灰（不可点击）
+        assert not copy_btn.isEnabled(), "Copy button should be disabled after successful execution"
+        assert copy_btn.text() == "已全部复制", f"Expected '已全部复制', got {copy_btn.text()}"
+        print("Copy button disabled and changed to '已全部复制' [OK]")
+
     print("\nALL MODULE 2 COPY EXECUTION TESTS PASSED SUCCESSFULLY!")
 
 

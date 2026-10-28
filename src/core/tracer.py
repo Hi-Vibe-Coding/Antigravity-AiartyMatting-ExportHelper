@@ -46,4 +46,5 @@ class LogicalTraceItem:
     dest_file_path: Optional[Path] = None           # 目标文件完整物理路径
     dest_folder_display: str = ""                   # 目标文件夹相对显示路径（如 A 预制\Bracelet\B0-001）
     candidate_folders: Optional[List[Path]] = None  # 候选文件夹列表（同名不唯一时）
+    is_copied: bool = False                         # 是否已经成功执行过复制操作
 

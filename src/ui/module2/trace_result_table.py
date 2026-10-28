@@ -232,27 +232,36 @@ class TraceResultTableWidget(QWidget):
 
     def _update_view(self):
         total = len(self.trace_items)
-        normal_count = sum(1 for it in self.trace_items if it.status_type == "normal")
-        override_count = sum(1 for it in self.trace_items if it.status_type == "override")
+        # 统计尚未复制的待写入项
+        pending_normal = sum(1 for it in self.trace_items if it.status_type == "normal" and not it.is_copied)
+        pending_override = sum(1 for it in self.trace_items if it.status_type == "override" and not it.is_copied)
+        copied_count = sum(1 for it in self.trace_items if it.is_copied)
         ambiguous_count = sum(1 for it in self.trace_items if it.status_display == "同名文件夹不唯一")
         not_found_count = sum(1 for it in self.trace_items if it.status_display == "无法找到")
 
-        # 检查是否有可复制项（目标明确唯一定位）
-        can_copy = (normal_count + override_count) > 0
+        # 检查是否还有未复制的有效待写入项
+        can_copy = (pending_normal + pending_override) > 0
 
         if total > 0:
-            count_parts = [f"即将写入: {normal_count}"]
-            if override_count > 0:
-                count_parts.append(f"将覆盖: {override_count}")
+            count_parts = []
+            if copied_count > 0:
+                count_parts.append(f"已写入: {copied_count}")
+            if pending_normal > 0:
+                count_parts.append(f"待写入: {pending_normal}")
+            if pending_override > 0:
+                count_parts.append(f"将覆盖: {pending_override}")
             if ambiguous_count > 0:
                 count_parts.append(f"同名不唯一: {ambiguous_count}")
             if not_found_count > 0:
                 count_parts.append(f"无法找到: {not_found_count}")
 
             self.count_label.setText(f"(共 {total} 项 · " + " · ".join(count_parts) + ")")
-            self.status_label.setText(
-                f"分析完成：共检索 {total} 条数据，{normal_count} 项即将写入，{override_count} 项将覆盖，{ambiguous_count} 项同名不唯一，{not_found_count} 项无法找到"
-            )
+            if copied_count > 0 and not can_copy:
+                self.status_label.setText(f"所有有效项已全部成功复制写入（共 {copied_count} 项）")
+            else:
+                self.status_label.setText(
+                    f"分析完成：共检索 {total} 条数据，{pending_normal} 项待写入，{pending_override} 项将覆盖，{copied_count} 项已写入"
+                )
         else:
             self.count_label.setText("(0 项)")
 
@@ -260,9 +269,13 @@ class TraceResultTableWidget(QWidget):
         self.table.setVisible(has_items)
         self.empty_label.setVisible(not has_items)
         self.clear_btn.setEnabled(has_items)
+
+        # 需求：如果已经成功执行了“开始复制”，则按钮置灰（不可点击）
         self.copy_btn.setEnabled(can_copy)
         if can_copy:
-            self.copy_btn.setText(f"开始复制 ({normal_count + override_count})")
+            self.copy_btn.setText(f"开始复制 ({pending_normal + pending_override})")
+        elif copied_count > 0:
+            self.copy_btn.setText("已全部复制")
         else:
             self.copy_btn.setText("开始复制")
 

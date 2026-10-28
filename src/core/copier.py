@@ -78,6 +78,7 @@ class FileCopierWorker(QRunnable):
                 # 复制成功，更新状态
                 item.status_display = f"已成功写入到[{item.dest_folder_display}]"
                 item.status_type = "normal"
+                item.is_copied = True
                 success_count += 1
                 logger.debug(f"已成功复制: {src.name} -> {dst}")
 

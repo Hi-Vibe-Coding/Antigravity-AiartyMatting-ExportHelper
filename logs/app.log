@@ -33,3 +33,47 @@ AttributeError: 'PySide6.QtWidgets.QCommonStyle' object has no attribute 'CE_Ite
 [2026-10-28 17:27:02] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
 [2026-10-28 17:27:02] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
 [2026-10-28 17:27:02] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 17:38:19] [INFO] [Dummy-1] (copier.py:52): 开始后台执行文件复制任务，共 1 个待复制文件
+[2026-10-28 17:38:19] [DEBUG] [Dummy-1] (copier.py:82): 已成功复制: B0-001__1_attr1_subject.png -> D:\TimelessHan\shopify-product-assets\A 预制\Bracelet\B0-001\B0-001__1.png
+[2026-10-28 17:38:19] [INFO] [Dummy-1] (copier.py:90): 文件复制任务完成：成功 1 个，失败 0 个
+[2026-10-28 17:38:29] [INFO] [Dummy-1] (copier.py:52): 开始后台执行文件复制任务，共 1 个待复制文件
+[2026-10-28 17:38:29] [DEBUG] [Dummy-1] (copier.py:82): 已成功复制: B0-001__1_attr1_subject.png -> D:\TimelessHan\shopify-product-assets\A 预制\Bracelet\B0-001\B0-001__1.png
+[2026-10-28 17:38:29] [INFO] [Dummy-1] (copier.py:90): 文件复制任务完成：成功 1 个，失败 0 个
+[2026-10-28 17:42:27] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 17:42:27] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 17:42:27] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 17:42:27] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 17:42:46] [INFO] [Dummy-1] (copier.py:52): 开始后台执行文件复制任务，共 1 个待复制文件
+[2026-10-28 17:42:46] [DEBUG] [Dummy-1] (copier.py:83): 已成功复制: B0-001__1_attr1_subject.png -> D:\TimelessHan\shopify-product-assets\A 预制\Bracelet\B0-001\B0-001__1.png
+[2026-10-28 17:42:46] [INFO] [Dummy-1] (copier.py:91): 文件复制任务完成：成功 1 个，失败 0 个
+[2026-10-28 18:11:26] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 18:11:26] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 18:11:26] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 18:11:26] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 18:54:02] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 18:54:02] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 18:54:02] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 18:54:02] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 19:02:21] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 19:02:21] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 19:02:21] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 19:02:21] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 19:15:05] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 19:15:05] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 19:15:05] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 19:15:05] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 20:34:09] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 20:34:09] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 20:34:09] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 20:34:09] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 20:45:51] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 20:45:51] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 20:45:51] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 20:45:51] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 20:56:25] [INFO] [MainThread] (logger.py:56): ============================================================
+[2026-10-28 20:56:25] [INFO] [MainThread] (logger.py:57): 应用程序日志系统启动成功
+[2026-10-28 20:56:25] [INFO] [MainThread] (logger.py:58): 日志文件路径: D:\MyProject_Web2\AIAgentProjects\Antigravity-AiartyMatting-ExportHelper\logs\app.log
+[2026-10-28 20:56:25] [INFO] [MainThread] (logger.py:59): ============================================================
+[2026-10-28 20:58:05] [INFO] [Dummy-1] (copier.py:52): 开始后台执行文件复制任务，共 1 个待复制文件
+[2026-10-28 20:58:05] [DEBUG] [Dummy-1] (copier.py:83): 已成功复制: R3-137__1.png -> D:\TimelessHan\shopify-product-assets\A 预制\Ring\R3-137\R3-137__1.png
+[2026-10-28 20:58:05] [INFO] [Dummy-1] (copier.py:91): 文件复制任务完成：成功 1 个，失败 0 个

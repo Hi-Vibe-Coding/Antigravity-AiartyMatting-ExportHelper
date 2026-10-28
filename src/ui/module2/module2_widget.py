@@ -187,7 +187,7 @@ class Module2Widget(CardWidget):
         """需求：每当拖入一个新的源文件夹(或移除一个源文件夹)，则右侧数据列表就刷新为空"""
         self.right_table.clear_results()
 
-    def set_source_items(self, items: List[MatchedImageItem]):
+    def set_source_items(self, items: list):
         """接收模块1传递过来的数据列表"""
         self.source_module1_items = items
 
@@ -261,8 +261,8 @@ class Module2Widget(CardWidget):
             # 字段2计算：原文件仅显示纯文件名（如 B0-001__1_attr1_subject.png）
             raw_file_display = item.original_name
 
-            # 字段3计算：预期重命名
-            expected_rename = item.target_name
+            # 字段3计算：预期重命名（若无 target_name 则保持原文件名）
+            expected_rename = getattr(item, "target_name", item.original_name) or item.original_name
 
             target_name = item.logical_parent
             # 精确匹配（若无，可尝试不区分大小写查找）
@@ -372,14 +372,19 @@ class Module2Widget(CardWidget):
     def reset_module(self):
         """
         重置模块2全部数据与状态：
+        - 取消后台复制任务（若有）
         - 清空左侧选中的源文件夹
         - 清空右侧对照数据列表
         - 清空缓存的模块1有效数据源
         - 重新启用半透明锁定遮罩
         """
+        if self.current_copier_worker and hasattr(self.current_copier_worker, 'cancel'):
+            self.current_copier_worker.cancel()
+            self.current_copier_worker = None
         self.source_module1_items.clear()
         self.left_drop_zone.clear_folder()
         self.right_table.clear_results()
+        self.right_table.status_label.setText("就绪")
         self.set_locked(True)
 
     def set_locked(self, locked: bool):

@@ -206,3 +206,18 @@ class Module1Widget(CardWidget):
             duration=4000,
             position=InfoBarPosition.TOP
         )
+
+    def reset_module(self):
+        """重置模块1全部状态与数据回到初始状态"""
+        if self.current_scan_worker and hasattr(self.current_scan_worker, 'cancel'):
+            self.current_scan_worker.cancel()
+            self.current_scan_worker = None
+        if self.current_rename_worker and hasattr(self.current_rename_worker, 'cancel'):
+            self.current_rename_worker.cancel()
+            self.current_rename_worker = None
+
+        self.left_drop_zone.clear_all()
+        self.left_drop_zone.recursive_checkbox.setChecked(True)
+        self.right_result_table.clear_results()
+        self.right_result_table.only_valid_checkbox.setChecked(False)
+        self.right_result_table.set_loading(False)
