@@ -116,6 +116,9 @@ class FolderDropZoneWidget(QFrame):
     区域1左侧模块：子文件夹拖拽与管理面板
     """
     start_scan_requested = Signal(list, bool)  # 传递 List[Path], bool(是否递归扫描)
+    folder_added = Signal(Path)                # 当成功拖入/添加新子文件夹时发出信号
+    folder_removed = Signal(Path)              # 当移除单个子文件夹时发出信号
+    folders_cleared = Signal()                 # 当全部清空子文件夹时发出信号
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -270,6 +273,7 @@ class FolderDropZoneWidget(QFrame):
         self.list_content_layout.insertWidget(self.list_content_layout.count() - 1, card)
 
         self._update_state()
+        self.folder_added.emit(folder_path)
 
     def remove_folder(self, folder_path: Path):
         if folder_path in self.folder_set:
@@ -286,6 +290,7 @@ class FolderDropZoneWidget(QFrame):
                         break
 
             self._update_state()
+            self.folder_removed.emit(folder_path)
 
     def clear_all(self):
         self.folder_set.clear()
@@ -297,6 +302,7 @@ class FolderDropZoneWidget(QFrame):
                 item.widget().deleteLater()
 
         self._update_state()
+        self.folders_cleared.emit()
 
     def _update_state(self):
         count = len(self.folder_list)

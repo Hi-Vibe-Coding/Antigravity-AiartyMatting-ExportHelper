@@ -6,7 +6,7 @@ Handles asynchronous scanning and renaming via QThreadPool.
 from pathlib import Path
 from typing import List
 
-from PySide6.QtCore import Qt, QThreadPool
+from PySide6.QtCore import Qt, QThreadPool, Signal
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QSplitter
 from qfluentwidgets import (
     CardWidget, TitleLabel, CaptionLabel, InfoBar, InfoBarPosition, isDarkTheme
@@ -23,6 +23,7 @@ class Module1Widget(CardWidget):
     """
     区域1 / 模块1 主容器卡片
     """
+    folder_list_modified = Signal()  # 当模块1的子文件夹发生变动时发出信号，通知外部重置模块2
     def __init__(self, parent=None):
         super().__init__(parent)
         self.thread_pool = QThreadPool.globalInstance()
@@ -85,7 +86,15 @@ class Module1Widget(CardWidget):
 
     def _bind_events(self):
         self.left_drop_zone.start_scan_requested.connect(self._start_scanning)
+        self.left_drop_zone.folder_added.connect(self._on_folder_changed)
+        self.left_drop_zone.folder_removed.connect(self._on_folder_changed)
+        self.left_drop_zone.folders_cleared.connect(self._on_folder_changed)
         self.right_result_table.rename_requested.connect(self._start_renaming)
+
+    def _on_folder_changed(self, *args):
+        """需求：每当拖入一个新的子文件夹(或移除一个子文件夹)，右侧数据列表就刷新为空，且通知外部重置模块2"""
+        self.right_result_table.clear_results()
+        self.folder_list_modified.emit()
 
     def _start_scanning(self, folder_paths: List[Path], recursive: bool = True):
         self.right_result_table.set_loading(True)

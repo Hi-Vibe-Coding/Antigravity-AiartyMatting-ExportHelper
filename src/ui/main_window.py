@@ -155,6 +155,9 @@ class MainWindow(QMainWindow):
         self.module2_widget = Module2Widget(self.content_widget)
         self.content_layout.addWidget(self.module2_widget)
 
+        # 核心联动：模块1子文件夹变动时，右侧列表清空且模块2所有数据重置并重新半透明遮罩
+        self.module1_widget.folder_list_modified.connect(self.module2_widget.reset_module)
+
         self.scroll_area.setWidget(self.content_widget)
         main_layout.addWidget(self.scroll_area, stretch=1)
 
@@ -202,6 +205,9 @@ class MainWindow(QMainWindow):
             # 保持遮罩锁定
             self.module2_widget.set_locked(True)
         else:
+            # 传递有效数据项给模块2作为待分析源
+            self.module2_widget.set_source_items(pending_items)
+
             # 解除半透明遮罩，恢复正常显示
             self.module2_widget.set_locked(False)
             InfoBar.success(
