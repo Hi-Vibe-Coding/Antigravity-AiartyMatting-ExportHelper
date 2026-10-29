@@ -21,11 +21,8 @@ from src.config import APP_NAME_CN
 
 
 def setup_high_dpi():
-    """配置高分屏 DPI 自适应支持"""
-    if hasattr(Qt.ApplicationAttribute, "AA_EnableHighDpiScaling"):
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
-    if hasattr(Qt.ApplicationAttribute, "AA_UseHighDpiPixmaps"):
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+    """配置高分屏 DPI 自适应支持（Qt6 默认已原生启用高分屏缩放）"""
+    pass
 
 
 def main():

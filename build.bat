@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
+cd /d "%~dp0"
 title Aiarty Image 导出助手 - 一键生成独立可执行程序 (.EXE)
 
 echo ============================================================
@@ -24,6 +25,7 @@ if %ERRORLEVEL% NEQ 0 (
     %PYTHON_EXE% -m pip install pyinstaller
     if %ERRORLEVEL% NEQ 0 (
         echo [错误] PyInstaller 安装失败，请检查网络连接！
+        echo.
         pause
         exit /b 1
     )
@@ -62,6 +64,7 @@ if %ERRORLEVEL% NEQ 0 (
     echo ============================================================
     echo [失败] 打包过程中出现错误，请检查上方日志输出！
     echo ============================================================
+    echo.
     pause
     exit /b %ERRORLEVEL%
 )
@@ -77,5 +80,4 @@ echo 1. 可以直接拷贝或发送给其他 Windows 电脑运行；
 echo 2. 目标电脑无需安装 Python、无需配置任何开发环境；
 echo 3. 双击即可直接启动使用！
 echo.
-
 pause
