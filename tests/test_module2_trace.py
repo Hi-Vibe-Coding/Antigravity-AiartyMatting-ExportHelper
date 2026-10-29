@@ -82,9 +82,9 @@ def run_tests():
         m2._run_analysis(root_folder)
 
         table = m2.right_table.table
-        assert table.columnCount() == 4, f"Expected 4 columns, got {table.columnCount()}"
-        assert [table.horizontalHeaderItem(i).text() for i in range(4)] == ["序号", "原文件", "预期重命名", "状态"]
-        print("Header and 4-column structure verified [OK]")
+        assert table.columnCount() == 5, f"Expected 5 columns, got {table.columnCount()}"
+        assert [table.horizontalHeaderItem(i).text() for i in range(5)] == ["序号", "原文件", "预期重命名", "状态", "跳转"]
+        print("Header and 5-column structure verified [OK]")
 
         results = m2.right_table.trace_items
         assert len(results) == 4
@@ -98,9 +98,16 @@ def run_tests():
         assert row0_expected == "B0-001__1.png"
         assert row0_status == "即将被写入到[A_Prefab\\Bracelet\\B0-001]"
         assert results[0].status_type == "normal"
-        print("Test Case 1 (Normal Write Path with Brackets & Pure Filename) [OK]")
 
-        # 验证项2: 同名文件已存在 -> 即将被写入到[XXXX](同名文件将覆盖!)
+        # 检查跳转按钮 (Row 0 有匹配文件夹，跳转按钮应可用)
+        jump_widget_0 = table.cellWidget(0, 4)
+        assert jump_widget_0 is not None
+        jump_btn_0 = jump_widget_0.findChild(type(m2.right_table.clear_btn))
+        assert jump_btn_0 is not None
+        assert jump_btn_0.isEnabled()
+        print("Test Case 1 (Normal Write Path & Jump Button Enabled) [OK]")
+
+        # 验证项2: 同名文件已存在 -> 默认未勾选删除时显示 即将被写入到[XXXX](同名文件将覆盖!)
         row1_orig = table.item(1, 1).text()
         row1_expected = table.item(1, 2).text()
         row1_status = table.item(1, 3).text()
@@ -109,23 +116,52 @@ def run_tests():
         assert row1_expected == "B0-002__1.png"
         assert row1_status == "即将被写入到[A_Prefab\\Rings\\B0-002](同名文件将覆盖!)"
         assert results[1].status_type == "override"
-        print("Test Case 2 (File Override Detection with Brackets & Pure Filename) [OK]")
+        print("Test Case 2 (File Override Detection when Unchecked) [OK]")
 
-        # 验证项3: 同名文件夹不唯一
+        # 验证跳转到已存在文件时触发 explorer.exe /select,"<path>"
+        from unittest.mock import patch
+        with patch("subprocess.Popen") as mock_popen:
+            m2.right_table._jump_to_target(results[1])
+            assert mock_popen.called
+            call_cmd = mock_popen.call_args[0][0]
+            assert call_cmd.startswith('explorer.exe /select,"')
+            assert str(existing_file.resolve()) in call_cmd
+            print(f"Verified explorer /select called with exact format: {call_cmd} [OK]")
+
+        # 验证勾选“先删除同名图片文件”后状态动态刷新
+        m2.right_table.delete_existing_checkbox.setChecked(True)
+        row1_status_checked = table.item(1, 3).text()
+        print(f"Row 1 (After Checked): status='{row1_status_checked}'")
+        assert "原文件夹的B0-002__1.png会被删除" in row1_status_checked
+        assert results[1].status_type == "override"
+
+        # 取消勾选，恢复覆盖提示
+        m2.right_table.delete_existing_checkbox.setChecked(False)
+        row1_status_unchecked = table.item(1, 3).text()
+        assert row1_status_unchecked == "即将被写入到[A_Prefab\\Rings\\B0-002](同名文件将覆盖!)"
+        print("Test Case 2.1 (Dynamic delete existing checkbox toggle) [OK]")
+
+        # 验证项3: 同名文件夹不唯一 (跳转按钮应禁用)
         row2_status = table.item(2, 3).text()
         print(f"Row 2: status='{row2_status}'")
         assert row2_status == "同名文件夹不唯一"
         assert results[2].status_type == "error"
-        print("Test Case 3 (Ambiguous Folder Detection) [OK]")
+        jump_widget_2 = table.cellWidget(2, 4)
+        jump_btn_2 = jump_widget_2.findChild(type(m2.right_table.clear_btn))
+        assert not jump_btn_2.isEnabled()
+        print("Test Case 3 (Ambiguous Folder Detection & Jump Button Disabled) [OK]")
 
-        # 验证项4: 无法找到
+        # 验证项4: 无法找到 (跳转按钮应禁用)
         row3_status = table.item(3, 3).text()
         print(f"Row 3: status='{row3_status}'")
         assert row3_status == "无法找到"
         assert results[3].status_type == "error"
-        print("Test Case 4 (Not Found Detection) [OK]")
+        jump_widget_3 = table.cellWidget(3, 4)
+        jump_btn_3 = jump_widget_3.findChild(type(m2.right_table.clear_btn))
+        assert not jump_btn_3.isEnabled()
+        print("Test Case 4 (Not Found Detection & Jump Button Disabled) [OK]")
 
-    print("\nALL ENHANCED 4-COLUMN LOGIC TESTS PASSED SUCCESSFULLY!")
+    print("\nALL ENHANCED 5-COLUMN LOGIC AND JUMP/DELETE TESTS PASSED SUCCESSFULLY!")
 
 
 if __name__ == "__main__":

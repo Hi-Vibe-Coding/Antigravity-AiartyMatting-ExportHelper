@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, Signal, QRunnable
 
 from src.core.tracer import LogicalTraceItem
 from src.core.logger import logger
+from src.config import ALL_IMAGE_EXTENSIONS
 
 
 class CopierSignals(QObject):
@@ -23,11 +24,13 @@ class FileCopierWorker(QRunnable):
     后台异步执行文件复制任务：
     - 针对数据对照表中有效的目标路径（即 status_type 为 normal 或 override 的项）
     - 将原图片复制到对应的目标同名逻辑父文件夹中，命名为预期重命名
+    - 若开启 delete_existing_images，复制前先清理目标文件夹中同名但不同/相同格式的旧图片（如 .png/.jpg/.jpeg/.webp）
     - 汇报实时进度与结果
     """
-    def __init__(self, trace_items: List[LogicalTraceItem]):
+    def __init__(self, trace_items: List[LogicalTraceItem], delete_existing_images: bool = False):
         super().__init__()
         self.trace_items = trace_items
+        self.delete_existing_images = delete_existing_images
         self.signals = CopierSignals()
         self._is_cancelled = False
 
@@ -71,6 +74,17 @@ class FileCopierWorker(QRunnable):
 
                 # 确保目标父文件夹存在
                 dst.parent.mkdir(parents=True, exist_ok=True)
+
+                # 需求：若勾选“先删除同名图片文件”，先清理目标文件夹中该名称的所有格式旧图片
+                if self.delete_existing_images and item.matched_target_folder and item.matched_target_folder.is_dir():
+                    stem = dst.stem
+                    try:
+                        for existing_file in list(item.matched_target_folder.iterdir()):
+                            if existing_file.is_file() and existing_file.stem == stem and existing_file.suffix.lower() in ALL_IMAGE_EXTENSIONS:
+                                existing_file.unlink(missing_ok=True)
+                                logger.info(f"已清理目标同名旧图片文件: {existing_file}")
+                    except Exception as del_err:
+                        logger.warning(f"清理旧同名图片失败: {del_err}")
 
                 # 执行文件复制（保持元数据）
                 shutil.copy2(src, dst)

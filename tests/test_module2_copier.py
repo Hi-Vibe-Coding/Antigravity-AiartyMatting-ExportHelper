@@ -31,6 +31,14 @@ def run_tests():
         b0_dir = source_root / "A_Prefab" / "Bracelet" / "B0-001"
         b0_dir.mkdir(parents=True)
 
+        # 模拟在目标文件夹中存在旧格式文件（例如 .jpg 和 .webp）
+        old_jpg = b0_dir / "B0-001__1.jpg"
+        old_jpg.write_bytes(b"OLD_JPG_DATA")
+        old_webp = b0_dir / "B0-001__1.webp"
+        old_webp.write_bytes(b"OLD_WEBP_DATA")
+        unrelated_file = b0_dir / "other_photo.png"
+        unrelated_file.write_bytes(b"OTHER_DATA")
+
         # 2. 创建待复制原图片文件
         scan_folder = temp_dir / "ScannedImages"
         scan_folder.mkdir(parents=True)
@@ -56,8 +64,16 @@ def run_tests():
         m2.set_source_items([item1, item2])
         m2.left_drop_zone.set_folder(source_root)
 
+        # 勾选“先删除同名图片文件”
+        m2.right_table.delete_existing_checkbox.setChecked(True)
+
         # 执行分析
         m2._run_analysis(source_root)
+
+        # 验证提示信息包含同名旧文件将被删除
+        status_row0 = m2.right_table.table.item(0, 3).text()
+        print(f"Status row 0 with delete checked: {status_row0}")
+        assert "B0-001__1.jpg" in status_row0 or "B0-001__1.webp" in status_row0
 
         copy_btn = m2.right_table.copy_btn
         assert copy_btn.isEnabled(), "Copy button should be enabled after analysis with valid targets"
@@ -79,6 +95,13 @@ def run_tests():
         assert target_file2.exists(), f"Target file 2 does not exist: {target_file2}"
         assert target_file1.read_bytes() == b"PNG_FAKE_IMAGE_DATA_1", "Target file 1 content mismatch"
         assert target_file2.read_bytes() == b"PNG_FAKE_IMAGE_DATA_2", "Target file 2 content mismatch"
+
+        # 验证同名的旧格式图片是否已被成功物理删除
+        assert not old_jpg.exists(), "Old JPG file should have been deleted before copy"
+        assert not old_webp.exists(), "Old WebP file should have been deleted before copy"
+        # 验证非同名文件未被误删
+        assert unrelated_file.exists(), "Unrelated file in target directory must NOT be deleted"
+        print("Pre-existing same-stem files (.jpg/.webp) deleted and non-related files preserved [OK]")
         print("Physical file copy integrity verified [OK]")
 
         # 验证界面状态文本

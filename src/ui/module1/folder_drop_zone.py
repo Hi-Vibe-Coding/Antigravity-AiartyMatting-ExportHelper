@@ -7,8 +7,8 @@ Fully optimized for both Light and Dark modes.
 from pathlib import Path
 from typing import List, Set
 
-from PySide6.QtCore import Qt, Signal, QFileInfo
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QFont
+from PySide6.QtCore import Qt, Signal, QFileInfo, QEvent
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QFont, QCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QFileDialog
@@ -16,8 +16,10 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     CardWidget, PrimaryPushButton, PushButton, TransparentToolButton,
     FluentIcon, IconWidget, InfoBar, InfoBarPosition, SmoothScrollArea, StrongBodyLabel,
-    CaptionLabel, SubtitleLabel, CheckBox, isDarkTheme
+    CaptionLabel, SubtitleLabel, CheckBox, RoundMenu, Action, isDarkTheme
 )
+
+from src.ui.clipboard_helper import extract_folders_from_clipboard
 
 
 class FolderItemCard(CardWidget):
@@ -174,7 +176,7 @@ class FolderDropZoneWidget(QFrame):
         self.placeholder_tip.setAlignment(Qt.AlignmentFlag.AlignCenter)
         placeholder_layout.addWidget(self.placeholder_tip)
 
-        self.placeholder_subtip = CaptionLabel("支持逐一拖入，系统将自动校验去重", self.placeholder_widget)
+        self.placeholder_subtip = CaptionLabel("支持逐一拖入或右键粘贴，自动校验去重", self.placeholder_widget)
         self.placeholder_subtip.setAlignment(Qt.AlignmentFlag.AlignCenter)
         placeholder_layout.addWidget(self.placeholder_subtip)
 
@@ -225,8 +227,70 @@ class FolderDropZoneWidget(QFrame):
 
         layout.addLayout(bottom_layout)
 
+        # 为拖拽容器及内部所有子部件统一安装事件过滤器（右键弹出菜单）
+        self._install_paste_filter(self.drop_container)
+
         # 绑定拖拽事件
         self.drop_container.folder_dropped.connect(self.add_folder)
+
+    def _install_paste_filter(self, widget: QWidget):
+        widget.installEventFilter(self)
+        for child in widget.findChildren(QWidget):
+            child.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.RightButton:
+                self._show_context_menu(QCursor.pos(), is_global=True)
+                return True
+        elif event.type() == QEvent.Type.ContextMenu:
+            self._show_context_menu(QCursor.pos(), is_global=True)
+            return True
+        return super().eventFilter(watched, event)
+
+    def _show_context_menu(self, pos, is_global: bool = False):
+        menu = RoundMenu(parent=self)
+        paste_act = Action(FluentIcon.PASTE, "粘贴文件夹", self)
+        paste_act.triggered.connect(self.paste_from_clipboard)
+        menu.addAction(paste_act)
+        global_pos = pos if is_global else self.drop_container.mapToGlobal(pos)
+        menu.exec(global_pos)
+
+    def paste_from_clipboard(self):
+        """响应粘贴操作：从剪贴板提取文件夹并添加"""
+        folders = extract_folders_from_clipboard()
+        if not folders:
+            InfoBar.warning(
+                title="未检测到文件夹",
+                content="剪贴板中未检测到有效文件夹路径，请先在资源管理器中复制文件夹或其完整路径！",
+                parent=self.window(),
+                duration=2500,
+                position=InfoBarPosition.TOP
+            )
+            return
+
+        added_count = 0
+        for folder in folders:
+            if folder not in self.folder_set:
+                self.add_folder(folder)
+                added_count += 1
+
+        if added_count > 0:
+            InfoBar.success(
+                title="粘贴成功",
+                content=f"已成功添加 {added_count} 个文件夹！",
+                parent=self.window(),
+                duration=2000,
+                position=InfoBarPosition.TOP
+            )
+        else:
+            InfoBar.info(
+                title="文件夹已存在",
+                content="剪贴板中的文件夹已全部存在于列表中，无需重复添加。",
+                parent=self.window(),
+                duration=2000,
+                position=InfoBarPosition.TOP
+            )
 
     def update_theme(self, is_dark: bool):
         """根据当前深浅主题，刷新边框和辅助文字的高对比度配色"""
@@ -270,6 +334,7 @@ class FolderDropZoneWidget(QFrame):
 
         card = FolderItemCard(folder_path, self.list_content_widget)
         card.removed.connect(self.remove_folder)
+        self._install_paste_filter(card)
         self.list_content_layout.insertWidget(self.list_content_layout.count() - 1, card)
 
         self._update_state()

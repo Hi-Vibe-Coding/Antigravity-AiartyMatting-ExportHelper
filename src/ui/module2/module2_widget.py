@@ -16,7 +16,7 @@ from qfluentwidgets import (
     InfoBar, InfoBarPosition, isDarkTheme
 )
 
-from src.config import MatchedImageItem
+from src.config import MatchedImageItem, ALL_IMAGE_EXTENSIONS
 from src.core.tracer import LogicalTraceItem, format_relative_path
 from src.core.copier import FileCopierWorker
 from src.ui.module2.single_folder_drop_zone import SingleFolderDropZone
@@ -139,7 +139,8 @@ class Module2Widget(CardWidget):
 
         self.right_table.set_copying_state(True)
 
-        worker = FileCopierWorker(items_to_copy)
+        delete_existing = self.right_table.delete_existing_checkbox.isChecked()
+        worker = FileCopierWorker(items_to_copy, delete_existing_images=delete_existing)
         worker.signals.progress.connect(self._on_copy_progress)
         worker.signals.finished.connect(self._on_copy_finished)
         worker.signals.error.connect(self._on_copy_error)
@@ -280,16 +281,36 @@ class Module2Widget(CardWidget):
                 matched_folder = matches[0]
                 dest_file = matched_folder / expected_rename
 
-                # 检查同名文件夹中是否已有同名图片文件
+                # 检查同名文件夹中是否已有同名图片文件 (不限于相同扩展名)
+                same_stem_files = []
+                if matched_folder.is_dir():
+                    expected_stem = Path(expected_rename).stem
+                    try:
+                        for f in matched_folder.iterdir():
+                            if f.is_file() and f.stem == expected_stem and f.suffix.lower() in ALL_IMAGE_EXTENSIONS:
+                                same_stem_files.append(f)
+                    except Exception as e:
+                        pass
+
                 # 计算目标路径相对显示（尽可能3层，如：A 预制\Bracelet\B0-001）
                 target_folder_display = format_relative_path(matched_folder, max_levels=3)
 
-                if dest_file.exists():
-                    status_text = f"即将被写入到[{target_folder_display}](同名文件将覆盖!)"
-                    status_type = "override"
+                delete_checked = self.right_table.delete_existing_checkbox.isChecked()
+                if delete_checked:
+                    if same_stem_files:
+                        del_names = "、".join(f.name for f in same_stem_files)
+                        status_text = f"即将被写入到[{target_folder_display}]，原文件夹的{del_names}会被删除"
+                        status_type = "override"
+                    else:
+                        status_text = f"即将被写入到[{target_folder_display}]"
+                        status_type = "normal"
                 else:
-                    status_text = f"即将被写入到[{target_folder_display}]"
-                    status_type = "normal"
+                    if dest_file.exists():
+                        status_text = f"即将被写入到[{target_folder_display}](同名文件将覆盖!)"
+                        status_type = "override"
+                    else:
+                        status_text = f"即将被写入到[{target_folder_display}]"
+                        status_type = "normal"
 
                 trace_item = LogicalTraceItem(
                     original_item_idx=idx + 1,
@@ -302,7 +323,8 @@ class Module2Widget(CardWidget):
                     matched_target_folder=matched_folder,
                     dest_file_path=dest_file,
                     dest_folder_display=target_folder_display,
-                    candidate_folders=matches
+                    candidate_folders=matches,
+                    existing_same_stem_files=same_stem_files
                 )
             elif match_count > 1:
                 # 同名文件夹不唯一
@@ -383,6 +405,7 @@ class Module2Widget(CardWidget):
             self.current_copier_worker = None
         self.source_module1_items.clear()
         self.left_drop_zone.clear_folder()
+        self.right_table.delete_existing_checkbox.setChecked(False)
         self.right_table.clear_results()
         self.right_table.status_label.setText("就绪")
         self.set_locked(True)

@@ -7,16 +7,18 @@ Provides '开始分析' button at bottom-right.
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal, QFileInfo
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QFont
+from PySide6.QtCore import Qt, Signal, QFileInfo, QEvent
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QFont, QCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QFileDialog
 )
 from qfluentwidgets import (
     CardWidget, PrimaryPushButton, PushButton, TransparentToolButton,
     FluentIcon, IconWidget, InfoBar, InfoBarPosition, StrongBodyLabel,
-    CaptionLabel, SubtitleLabel, isDarkTheme
+    CaptionLabel, SubtitleLabel, RoundMenu, Action, isDarkTheme
 )
+
+from src.ui.clipboard_helper import extract_folders_from_clipboard
 
 
 class SingleFolderCard(CardWidget):
@@ -189,7 +191,7 @@ class SingleFolderDropZone(QWidget):
         self.tip_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_layout.addWidget(self.tip_label)
 
-        self.sub_tip = CaptionLabel("仅限单个目标根文件夹（在此目录下查找同名逻辑父文件夹）", self.empty_widget)
+        self.sub_tip = CaptionLabel("仅限单个目标根文件夹（支持拖拽或右键粘贴）", self.empty_widget)
         self.sub_tip.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_layout.addWidget(self.sub_tip)
 
@@ -224,9 +226,69 @@ class SingleFolderDropZone(QWidget):
 
     def _bind_events(self):
         self.drop_container.folder_dropped.connect(self.set_folder)
+
+        # 为拖拽容器及内部所有子部件统一安装事件过滤器（右键弹出菜单）
+        self._install_paste_filter(self.drop_container)
+
         self.browse_btn.clicked.connect(self._on_browse_clicked)
         self.clear_btn.clicked.connect(self.clear_folder)
         self.analyze_btn.clicked.connect(self._on_analyze_clicked)
+
+    def _install_paste_filter(self, widget: QWidget):
+        widget.installEventFilter(self)
+        for child in widget.findChildren(QWidget):
+            child.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.RightButton:
+                self._show_context_menu(QCursor.pos(), is_global=True)
+                return True
+        elif event.type() == QEvent.Type.ContextMenu:
+            self._show_context_menu(QCursor.pos(), is_global=True)
+            return True
+        return super().eventFilter(watched, event)
+
+    def _show_context_menu(self, pos, is_global: bool = False):
+        menu = RoundMenu(parent=self)
+        paste_act = Action(FluentIcon.PASTE, "粘贴文件夹", self)
+        paste_act.triggered.connect(self.paste_from_clipboard)
+        menu.addAction(paste_act)
+        global_pos = pos if is_global else self.drop_container.mapToGlobal(pos)
+        menu.exec(global_pos)
+
+    def paste_from_clipboard(self):
+        """响应粘贴操作：从剪贴板提取目标父文件夹并设置"""
+        folders = extract_folders_from_clipboard()
+        if not folders:
+            InfoBar.warning(
+                title="未检测到文件夹",
+                content="剪贴板中未检测到有效文件夹路径，请先在资源管理器中复制目标文件夹或其完整路径！",
+                parent=self.window(),
+                duration=2500,
+                position=InfoBarPosition.TOP
+            )
+            return
+
+        target_folder = folders[0]
+        self.set_folder(target_folder)
+
+        if len(folders) > 1:
+            InfoBar.info(
+                title="已设置首个文件夹",
+                content=f"检测到剪贴板包含多个文件夹，已将首个文件夹 '{target_folder.name}' 设为源文件夹。",
+                parent=self.window(),
+                duration=3000,
+                position=InfoBarPosition.TOP
+            )
+        else:
+            InfoBar.success(
+                title="粘贴成功",
+                content=f"已成功将 '{target_folder.name}' 设为目标源文件夹！",
+                parent=self.window(),
+                duration=2000,
+                position=InfoBarPosition.TOP
+            )
 
     def _on_browse_clicked(self):
         folder = QFileDialog.getExistingDirectory(self, "选择模块2源文件夹（目标父文件夹）")
@@ -247,6 +309,7 @@ class SingleFolderDropZone(QWidget):
 
         self.folder_card = SingleFolderCard(folder_path, self.card_container)
         self.folder_card.cleared.connect(self.clear_folder)
+        self._install_paste_filter(self.folder_card)
         self.card_container.layout().addWidget(self.folder_card)
 
         self.empty_widget.hide()

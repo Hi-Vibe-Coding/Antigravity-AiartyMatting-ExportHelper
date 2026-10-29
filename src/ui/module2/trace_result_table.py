@@ -3,6 +3,9 @@ Exclusive Data Table Widget (Module 2 Right Box)
 Displays analysis results matching Module 1 items against Module 2's source folder.
 Shows status: '已匹配' vs '无法找到' with high-contrast colors and tooltips.
 """
+import os
+import subprocess
+from pathlib import Path
 from typing import List
 
 from PySide6.QtCore import Qt, Signal
@@ -12,10 +15,11 @@ from PySide6.QtWidgets import (
 )
 from qfluentwidgets import (
     TableWidget, SubtitleLabel, CaptionLabel, PushButton, PrimaryPushButton, FluentIcon,
-    isDarkTheme, IndeterminateProgressBar, ProgressBar
+    CheckBox, isDarkTheme, IndeterminateProgressBar, ProgressBar
 )
 
 from src.core.tracer import LogicalTraceItem
+from src.core.logger import logger
 
 
 class TraceResultTableWidget(QWidget):
@@ -46,6 +50,13 @@ class TraceResultTableWidget(QWidget):
         self.count_label = CaptionLabel("(0 项)", self)
         header_layout.addWidget(self.count_label)
 
+        # 需求：添加勾选框“先删除同名图片文件”（默认不勾选）
+        self.delete_existing_checkbox = CheckBox("先删除同名图片文件", self)
+        self.delete_existing_checkbox.setChecked(False)
+        self.delete_existing_checkbox.setToolTip("勾选后，复制写入新图片前，将先清理目标同名文件夹中该名称的所有格式旧图片（如 .png/.jpg/.jpeg/.webp）")
+        self.delete_existing_checkbox.stateChanged.connect(self._on_delete_option_changed)
+        header_layout.addWidget(self.delete_existing_checkbox)
+
         header_layout.addStretch()
 
         self.rule_tip = CaptionLabel("状态匹配: 在目标源文件夹下查找同名逻辑父文件夹", self)
@@ -59,11 +70,11 @@ class TraceResultTableWidget(QWidget):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
-        # 对照数据表格（4列：序号、原文件、预期重命名、状态）
+        # 对照数据表格（5列：序号、原文件、预期重命名、状态、跳转）
         self.table = TableWidget(self)
-        self.table.setColumnCount(4)
+        self.table.setColumnCount(5)
         headers = [
-            "序号", "原文件", "预期重命名", "状态"
+            "序号", "原文件", "预期重命名", "状态", "跳转"
         ]
         self.table.setHorizontalHeaderLabels(headers)
         self.table.verticalHeader().hide()
@@ -75,6 +86,7 @@ class TraceResultTableWidget(QWidget):
         self.table.horizontalHeaderItem(1).setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.table.horizontalHeaderItem(2).setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.table.horizontalHeaderItem(3).setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.table.horizontalHeaderItem(4).setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # 列宽模式
         header = self.table.horizontalHeader()
@@ -82,9 +94,11 @@ class TraceResultTableWidget(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)        # 原文件
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)    # 预期重命名
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)        # 状态
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)          # 跳转
 
         self.table.setColumnWidth(0, 52)
         self.table.setColumnWidth(2, 170)
+        self.table.setColumnWidth(4, 100)
 
         layout.addWidget(self.table, stretch=1)
 
@@ -131,6 +145,75 @@ class TraceResultTableWidget(QWidget):
         self.trace_items = items
         self._refresh_table()
 
+    def _on_delete_option_changed(self):
+        """勾选或取消'先删除同名图片文件'时，动态更新各行状态展示与底部统计"""
+        self._refresh_table()
+
+    def _open_target_folder(self, folder_path: Path):
+        """兼容保留：在 Windows 资源管理器中打开目标文件夹"""
+        if not folder_path:
+            return
+        try:
+            resolved = folder_path.resolve()
+            if resolved.exists():
+                norm_folder = os.path.normpath(str(resolved))
+                os.startfile(norm_folder)
+                logger.info(f"成功打开目标文件夹: {norm_folder}")
+            else:
+                logger.warning(f"目标文件夹不存在，无法打开: {resolved}")
+        except Exception as e:
+            logger.error(f"打开目标文件夹失败: {folder_path}, 错误: {e}")
+
+    def _jump_to_target(self, item: LogicalTraceItem):
+        """
+        在 Windows 资源管理器中打开目标文件夹，并让目标图片文件被选中 (explorer.exe /select,"<file>")
+        注意：
+        1. 引号必须仅包裹路径本身，不能包裹 /select, 开关，否则 Windows explorer 会因无法解析而错误打开“我的文档”。
+        2. 若目标物理文件尚未生成，直接以文件夹路径打开，避免 explorer 因找不到文件而回退到“我的文档”。
+        """
+        if not item or not item.matched_target_folder:
+            return
+
+        target_folder = item.matched_target_folder.resolve()
+        dest_file = item.dest_file_path.resolve() if item.dest_file_path else None
+
+        # 检查是否有真实存在的物理文件可供定位选中
+        target_file_to_select = None
+        if dest_file and dest_file.exists():
+            target_file_to_select = dest_file
+        elif item.existing_same_stem_files:
+            for old_file in item.existing_same_stem_files:
+                if old_file and old_file.exists():
+                    target_file_to_select = old_file.resolve()
+                    break
+
+        if target_file_to_select:
+            try:
+                # 规范化反斜杠，并构造原生无误的命令字符串
+                norm_file = os.path.normpath(str(target_file_to_select))
+                cmd = f'explorer.exe /select,"{norm_file}"'
+                subprocess.Popen(cmd)
+                logger.info(f"成功打开目标文件夹并选中目标文件: {norm_file}")
+                return
+            except Exception as e:
+                logger.error(f"使用 explorer /select 打开文件失败: {target_file_to_select}, 错误: {e}")
+
+        # 若目标物理文件尚未写入生成，直接在资源管理器中打开目标逻辑父文件夹
+        try:
+            if target_folder.exists():
+                norm_folder = os.path.normpath(str(target_folder))
+                os.startfile(norm_folder)
+                logger.info(f"目标文件尚未物理生成，成功打开目标所在文件夹: {norm_folder}")
+            else:
+                logger.warning(f"目标文件夹不存在，无法打开: {target_folder}")
+        except Exception as e:
+            logger.error(f"打开目标文件夹失败: {target_folder}, 错误: {e}")
+            try:
+                norm_folder = os.path.normpath(str(target_folder))
+                subprocess.Popen(f'explorer.exe "{norm_folder}"')
+            except Exception:
+                pass
+
     def _refresh_table(self):
         self.table.setRowCount(0)
         is_dark = isDarkTheme()
@@ -139,9 +222,11 @@ class TraceResultTableWidget(QWidget):
         text_color = QColor("#ffffff" if is_dark else "#1a1a1a")
         accent_blue = QColor("#60cdff" if is_dark else "#0078d4")
         success_green = QColor("#52c41a" if is_dark else "#237804")
-        warning_orange = QColor("#fa8c16" if is_dark else "#d46b08")  # 警示橙色（覆盖警告/同名不唯一）
+        warning_orange = QColor("#fa8c16" if is_dark else "#d46b08")  # 警示橙色（覆盖警告/同名不唯一/删除旧文件提示）
         vivid_red = QColor("#ff4d4f" if is_dark else "#e81123")       # 错误大红色
         muted_color = QColor("#8c8c8c" if is_dark else "#8c8c8c")
+
+        delete_checked = self.delete_existing_checkbox.isChecked()
 
         for row, item in enumerate(self.trace_items):
             self.table.insertRow(row)
@@ -152,7 +237,7 @@ class TraceResultTableWidget(QWidget):
             item_idx.setForeground(QBrush(text_color))
             self.table.setItem(row, 0, item_idx)
 
-            # 1. 原文件 (左对齐，尽可能显示2层文件夹及文件名)
+            # 1. 原文件 (左对齐，显示原文件名)
             item_orig = QTableWidgetItem(item.raw_file_display)
             item_orig.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             item_orig.setForeground(QBrush(text_color))
@@ -160,7 +245,7 @@ class TraceResultTableWidget(QWidget):
                 item_orig.setToolTip(f"原文件完整物理路径：\n{item.full_source_file}")
             self.table.setItem(row, 1, item_orig)
 
-            # 2. 预期重命名 (左对齐，加粗黑色/白色)
+            # 2. 预期重命名 (左对齐，加粗)
             item_expected = QTableWidgetItem(item.expected_rename)
             item_expected.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             item_expected.setForeground(QBrush(text_color))
@@ -169,7 +254,25 @@ class TraceResultTableWidget(QWidget):
             item_expected.setFont(f)
             self.table.setItem(row, 2, item_expected)
 
-            # 3. 状态 (标准原生文本呈现，不使用内部独立着色)
+            # 动态计算未复制完成项的状态文本
+            if not item.is_copied and item.matched_target_folder:
+                if delete_checked:
+                    if item.existing_same_stem_files:
+                        del_names = "、".join(f.name for f in item.existing_same_stem_files)
+                        item.status_display = f"即将被写入到[{item.dest_folder_display}]，原文件夹的{del_names}会被删除"
+                        item.status_type = "override"
+                    else:
+                        item.status_display = f"即将被写入到[{item.dest_folder_display}]"
+                        item.status_type = "normal"
+                else:
+                    if item.dest_file_path and item.dest_file_path.exists():
+                        item.status_display = f"即将被写入到[{item.dest_folder_display}](同名文件将覆盖!)"
+                        item.status_type = "override"
+                    else:
+                        item.status_display = f"即将被写入到[{item.dest_folder_display}]"
+                        item.status_type = "normal"
+
+            # 3. 状态 (原生文本呈现并高亮)
             status_item = QTableWidgetItem(item.status_display)
             status_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             f_status = status_item.font()
@@ -182,20 +285,48 @@ class TraceResultTableWidget(QWidget):
                 if item.dest_file_path:
                     status_item.setToolTip(f"目标完整路径：\n{item.dest_file_path}")
             elif item.status_type == "override":
-                # 即将被写入到[XXXX](同名文件将覆盖!)
+                # 即将被写入到[XXXX](同名文件将覆盖!) 或 提示先删除同名文件
                 status_item.setForeground(QBrush(warning_orange))
                 if item.dest_file_path:
-                    status_item.setToolTip(f"[注意] 该目标路径下已存在同名图片文件，继续操作将被覆盖：\n{item.dest_file_path}")
+                    if delete_checked and item.existing_same_stem_files:
+                        del_names = "、".join(f.name for f in item.existing_same_stem_files)
+                        status_item.setToolTip(f"[注意] 复制前将先物理删除目标文件夹中的同名旧图片：{del_names}\n目标写入完整路径：\n{item.dest_file_path}")
+                    else:
+                        status_item.setToolTip(f"[注意] 该目标路径下已存在同名图片文件，继续操作将被覆盖：\n{item.dest_file_path}")
             elif item.status_display == "同名文件夹不唯一":
                 status_item.setForeground(QBrush(warning_orange))
                 cand_str = "\n".join(str(p) for p in (item.candidate_folders or []))
                 status_item.setToolTip(f"[冲突] 源文件夹下存在多个名为「{item.logical_parent}」的子文件夹：\n{cand_str}")
             else:
-                # 无法找到
+                # 无法找到 或 源文件不存在
                 status_item.setForeground(QBrush(vivid_red))
                 status_item.setToolTip(f"在源文件夹中未找到名为「{item.logical_parent}」的文件夹！")
 
             self.table.setItem(row, 3, status_item)
+
+            # 4. 跳转 (操作按钮：点击在 Windows 资源管理器中打开目标文件夹)
+            cell_widget = QWidget(self.table)
+            cell_layout = QHBoxLayout(cell_widget)
+            cell_layout.setContentsMargins(2, 2, 2, 2)
+            cell_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            jump_btn = PushButton(FluentIcon.FOLDER, "跳转", cell_widget)
+            jump_btn.setFixedSize(80, 28)
+            jump_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+            if item.matched_target_folder and item.matched_target_folder.exists():
+                target_item = item
+                jump_btn.clicked.connect(lambda _, it=target_item: self._jump_to_target(it))
+                if item.dest_file_path:
+                    jump_btn.setToolTip(f"点击在资源管理器中打开并选中目标图片文件：\n{item.dest_file_path}")
+                else:
+                    jump_btn.setToolTip(f"点击在资源管理器中打开目标文件夹：\n{item.matched_target_folder}")
+            else:
+                jump_btn.setEnabled(False)
+                jump_btn.setToolTip("未匹配到有效目标文件夹")
+
+            cell_layout.addWidget(jump_btn)
+            self.table.setCellWidget(row, 4, cell_widget)
 
         self._update_view()
 
