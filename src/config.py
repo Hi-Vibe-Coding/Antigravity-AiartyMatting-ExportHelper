@@ -7,7 +7,7 @@ import re
 
 APP_NAME_EN = "Aiarty-Image-ExportHelper"
 APP_NAME_CN = "Aiarty Image 导出助手"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 # 扫描识别的所有图片格式集合
 ALL_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
